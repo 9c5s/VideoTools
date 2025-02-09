@@ -1,2 +1,6 @@
-*.txt
-*.lnk
+*
+!.gitignore
+!*.py
+!*.bat
+!*.ps1
+!*.json
