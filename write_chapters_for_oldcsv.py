@@ -1,9 +1,9 @@
 import sys
 import subprocess
-import os
 import csv
 import xml.etree.ElementTree as ET
 import tempfile
+from pathlib import Path
 
 
 def timestamp_to_seconds(timestamp):
@@ -82,60 +82,59 @@ def write_chapters(mkv_path, xml_path):
 
 def find_matching_csv(mkv_path):
     """MKVファイルに対応するCSVファイルを探す"""
-    base_path = os.path.splitext(mkv_path)[0]
-    csv_path = base_path + "_chapters.csv"
-    return csv_path if os.path.exists(csv_path) else None
+    mkv_path = Path(mkv_path)
+    csv_path = mkv_path.with_name(f"{mkv_path.stem}_chapters.csv")
+    return csv_path if csv_path.exists() else None
 
 
 def process_mkv_file(mkv_path):
     """1つのMKVファイルを処理"""
+    mkv_path = Path(mkv_path)
     csv_path = find_matching_csv(mkv_path)
     if not csv_path:
-        print(f"{os.path.basename(mkv_path)} に対応するCSVファイルが見つかりません")
+        print(f"{mkv_path.name} に対応するCSVファイルが見つかりません")
         return False
 
     try:
         # 一時XMLファイルのパスを設定
         with tempfile.NamedTemporaryFile(suffix=".xml", delete=False) as temp_file:
-            temp_xml = temp_file.name
+            temp_xml = Path(temp_file.name)
 
         # チャプター抽出
-        print(f"処理中: {os.path.basename(mkv_path)}")
+        print(f"処理中: {mkv_path.name}")
         print("チャプター情報を抽出中...")
-        extract_chapters(mkv_path, temp_xml)
+        extract_chapters(str(mkv_path), str(temp_xml))
 
         # チャプター更新
         print("チャプター情報を更新中...")
         chapters = read_chapters_from_csv(csv_path)
-        update_xml_chapters(temp_xml, chapters)
+        update_xml_chapters(str(temp_xml), chapters)
 
         # チャプター書き戻し
-        write_chapters(mkv_path, temp_xml)
+        write_chapters(str(mkv_path), str(temp_xml))
 
         # 一時ファイルを削除
-        os.remove(temp_xml)
+        temp_xml.unlink()
 
         return True
 
     except Exception as e:
         print(f"  エラーが発生しました: {str(e)}")
-        if os.path.exists(temp_xml):
-            os.remove(temp_xml)
+        if temp_xml.exists():
+            temp_xml.unlink()
         return False
 
 
 def process_directory(directory):
     """ディレクトリ内のMKVファイルを再帰的に処理"""
+    directory = Path(directory)
     success_count = 0
     total_count = 0
 
-    for root, _, files in os.walk(directory):
-        for file in files:
-            if file.lower().endswith(".mkv"):
-                total_count += 1
-                mkv_path = os.path.join(root, file)
-                if process_mkv_file(mkv_path):
-                    success_count += 1
+    for mkv_path in directory.rglob("*.mkv"):
+        total_count += 1
+        if process_mkv_file(mkv_path):
+            success_count += 1
 
     return success_count, total_count
 
@@ -149,13 +148,13 @@ def main():
     total_files = 0
     skipped_files = 0
 
-    for path in sys.argv[1:]:
-        if os.path.isdir(path):
+    for path in map(Path, sys.argv[1:]):
+        if path.is_dir():
             print(f"\nフォルダを処理中: {path}")
             success, total = process_directory(path)
             total_success += success
             total_files += total
-        elif path.lower().endswith(".mkv"):
+        elif path.suffix.lower() == ".mkv":
             csv_path = find_matching_csv(path)
             if not csv_path:
                 skipped_files += 1
