@@ -117,6 +117,10 @@ def process_mkv_file(mkv_path: Path) -> bool:
         # 一時ファイルを削除
         temp_xml.unlink()
 
+        # CSVファイルを削除
+        csv_path.unlink()
+        print(f"CSVファイルを削除しました: {csv_path.name}")
+
         return True
 
     except Exception as e:
