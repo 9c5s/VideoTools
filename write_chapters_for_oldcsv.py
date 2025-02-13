@@ -40,21 +40,15 @@ def update_xml_chapters(
     # チャプターの開始時間とタイトルのマッピングを作成
     chapter_map = {chapter["start"]: chapter["title"] for chapter in chapters}
 
-    # 全てのChapterTimeStartタグを検索
+    # 全てのChapterAtomを検索して処理
     for chapter in root.findall(".//ChapterAtom"):
-        time_start = chapter.find("ChapterTimeStart")
-        if time_start is not None:
-            seconds = timestamp_to_seconds(time_start.text)
+        time_start = chapter.find("ChapterTimeStart").text
+        seconds = timestamp_to_seconds(time_start)
 
-            # ChapterStringを検索
-            chapter_display = chapter.find("ChapterDisplay")
-            if chapter_display is not None:
-                chapter_string = chapter_display.find("ChapterString")
-                if chapter_string is not None:
-                    # 対応する秒数が見つかった場合、タイトルを更新
-                    matching_title = chapter_map.get(seconds)
-                    if matching_title:
-                        chapter_string.text = matching_title
+        # 対応する秒数が見つかった場合、タイトルを更新
+        matching_title = chapter_map.get(seconds)
+        if matching_title:
+            chapter.find("ChapterDisplay/ChapterString").text = matching_title
 
     # XMLを保存
     tree.write(xml_path, encoding="utf-8", xml_declaration=True)
