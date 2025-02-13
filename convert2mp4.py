@@ -1,6 +1,7 @@
 import logging
 import subprocess
 import sys
+import tempfile
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Iterator, Optional, Sequence, Tuple
@@ -91,17 +92,14 @@ def get_video_info(path: Path) -> Optional[Tuple[Path, str, str]]:
     return path, vcodec, get_codec_info(path, "a:0")
 
 
-def get_handbrake_command(
-    path: Path, video_codec: str, audio_codec: str
-) -> Sequence[str]:
+def get_handbrake_command(path: Path, tmp_path: Path) -> Sequence[str]:
     """HandBrakeコマンドを生成"""
-    output_path = get_output_path(path)
     common_args = [
         "HandBrakeCLI",
         "--input",
         str(path),
         "--output",
-        str(output_path),
+        str(tmp_path),
         "--format",
         "av_mp4",
         "--optimize",
@@ -109,25 +107,38 @@ def get_handbrake_command(
         "--markers",
     ]
 
-    if needs_encode(video_codec, audio_codec):
-        encode_args = [
-            "--encoder",
-            "nvenc_av1",
-            "--encoder-preset",
-            "slowest",
-            "--quality",
-            "40",
-            "--aencoder",
-            "aac",
-            "--ab",
-            "128",
-            "--mixdown",
-            "stereo",
-        ]
-    else:
-        encode_args = ["--copy-video", "--copy-audio"]
+    encode_args = [
+        "--encoder",
+        "nvenc_av1",
+        "--encoder-preset",
+        "slowest",
+        "--quality",
+        "40",
+        "--aencoder",
+        "aac",
+        "--ab",
+        "128",
+        "--mixdown",
+        "stereo",
+    ]
 
     return [*common_args, *encode_args]
+
+
+def get_ffmpeg_command(tmp_path: Path, output_path: Path) -> Sequence[str]:
+    """FFmpegコマンドを生成（メタデータ除去用）"""
+    return [
+        "ffmpeg",
+        "-i",
+        str(tmp_path),
+        "-map_metadata",
+        "-1",
+        "-c",
+        "copy",
+        "-movflags",
+        "+faststart",
+        str(output_path),
+    ]
 
 
 def convert_video(path: Path, video_codec: str, audio_codec: str) -> bool:
@@ -138,20 +149,36 @@ def convert_video(path: Path, video_codec: str, audio_codec: str) -> bool:
         return True
 
     logger.info(f"コーデック - ビデオ: {video_codec}, オーディオ: {audio_codec}")
-    logger.info(
-        f"{'エンコード' if needs_encode(video_codec, audio_codec) else 'コンテナ変換'}中: {path}"
-    )
+    logger.info(f"エンコード中: {path}")
+
+    # 一時ファイルを作成
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_file:
+        tmp_path = Path(tmp_file.name)
 
     try:
+        # HandBrakeでエンコード
         result = subprocess.run(
-            get_handbrake_command(path, video_codec, audio_codec),
+            get_handbrake_command(path, tmp_path),
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="replace",
         )
         if result.returncode != 0:
-            logger.error(f"エラー: 変換失敗: {path}")
+            logger.error(f"エラー: エンコード失敗: {path}")
+            logger.error(f"エラー内容: {result.stderr}")
+            return False
+
+        # FFmpegでメタデータ除去
+        result = subprocess.run(
+            get_ffmpeg_command(tmp_path, output_path),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if result.returncode != 0:
+            logger.error(f"エラー: メタデータ除去失敗: {path}")
             logger.error(f"エラー内容: {result.stderr}")
             return False
 
@@ -162,6 +189,12 @@ def convert_video(path: Path, video_codec: str, audio_codec: str) -> bool:
         logger.error(f"エラー: 変換失敗: {path}")
         logger.error(f"エラー内容: {str(e)}")
         return False
+
+    finally:
+        try:
+            tmp_path.unlink()
+        except Exception:
+            pass
 
 
 def process_single_file(args: Tuple[int, Path, int]) -> None:
