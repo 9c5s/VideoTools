@@ -21,12 +21,12 @@ def update_chapter_xml(csv_path: Path, xml_path: Path) -> None:
 
     # 各チャプターを検索して更新
     for chapter_atom in root.findall(".//ChapterAtom"):
-        time_start = chapter_atom.find("ChapterTimeStart")
-        if time_start.text not in chapters:
+        time_start = chapter_atom.find("ChapterTimeStart").text
+        if time_start not in chapters:
             continue
 
         chapter_string = chapter_atom.find("./ChapterDisplay/ChapterString")
-        new_name = chapters[time_start.text]
+        new_name = chapters[time_start]
         if chapter_string.text != new_name:
             chapter_string.text = new_name
 
