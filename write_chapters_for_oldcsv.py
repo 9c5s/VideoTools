@@ -172,6 +172,9 @@ def main() -> None:
     else:
         print("\nMKVファイルが見つかりませんでした")
 
+    print("\n何かキーを押すと終了します")
+    input()
+
 
 if __name__ == "__main__":
     main()

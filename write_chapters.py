@@ -136,6 +136,8 @@ def main() -> None:
         process_mkv_file(mkv_file, i, len(mkv_files))
 
     print("\n全ての処理が完了しました")
+    print("\n何かキーを押すと終了します")
+    input()
 
 
 if __name__ == "__main__":

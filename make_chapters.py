@@ -96,6 +96,9 @@ def main():
     for path in sys.argv[1:]:
         process_path(Path(path))
 
+    print("\n何かキーを押すと終了します")
+    input()
+
 
 if __name__ == "__main__":
     main()
