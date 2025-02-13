@@ -1,7 +1,7 @@
-import sys
-import subprocess
-import shutil
 import csv
+import shutil
+import subprocess
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 

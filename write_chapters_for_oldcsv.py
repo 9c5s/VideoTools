@@ -1,10 +1,10 @@
-import sys
-import subprocess
 import csv
-import xml.etree.ElementTree as ET
+import subprocess
+import sys
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 
 def timestamp_to_seconds(timestamp: str) -> float:
