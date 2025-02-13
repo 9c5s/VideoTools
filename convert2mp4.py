@@ -1,6 +1,7 @@
 import logging
 import subprocess
 import sys
+from multiprocessing import Pool
 from pathlib import Path
 from typing import Iterator, Optional, Sequence, Tuple
 
@@ -98,7 +99,7 @@ def get_ffmpeg_command(path: Path, video_codec: str, audio_codec: str) -> Sequen
         "-hide_banner",
         "-v",
         "error",
-        "-stats",
+        # "-stats",
         "-i",
         str(path),
         "-map_metadata",
@@ -152,39 +153,68 @@ def convert_video(path: Path, video_codec: str, audio_codec: str) -> bool:
         return False
 
 
-def process_paths(paths: Sequence[str]) -> None:
-    """パスリストを処理"""
-    video_files = [
-        video_file
-        for path_str in paths
-        for video_file in find_video_files(Path(path_str))
-    ]
-
-    if not video_files:
-        logger.info("変換対象のファイルが見つかりません")
-        return
-
-    for i, video_file in enumerate(video_files, 1):
-        logger.info(f"\n[{i}/{len(video_files)}] 処理中...")
+def process_single_file(args: Tuple[int, Path, int]) -> None:
+    """単一のビデオファイルを処理"""
+    try:
+        index, video_file, total_files = args
+        logger.info(f"\n[{index + 1}/{total_files}] 処理中...")
         if video_info := get_video_info(video_file):
             convert_video(*video_info)
+    except Exception as e:
+        logger.error(f"ファイル処理中にエラーが発生: {str(e)}")
+
+
+def process_paths(paths: Sequence[str]) -> None:
+    """パスリストを処理"""
+    try:
+        video_files = [
+            video_file
+            for path_str in paths
+            for video_file in find_video_files(Path(path_str))
+        ]
+
+        if not video_files:
+            logger.info("変換対象のファイルが見つかりません")
+            return
+
+        total_files = len(video_files)
+        logger.info(f"合計 {total_files} 個のファイルを処理します")
+
+        # 処理対象のファイルリストを準備
+        process_args = [(i, f, total_files) for i, f in enumerate(video_files)]
+
+        # 4プロセスで並列処理
+        with Pool(processes=4) as pool:
+            pool.map(process_single_file, process_args)
+
+    except Exception as e:
+        logger.error(f"エラーが発生しました: {str(e)}")
 
 
 def main() -> None:
     """メイン処理"""
-    if len(sys.argv) < 2:
-        print(
-            "使用方法: python convert2mp4.py <入力ファイル/フォルダ> [入力ファイル/フォルダ...]"
-        )
-        sys.exit(1)
-
-    process_paths(sys.argv[1:])
-
-    print("\n処理が完了しました。任意のキーを押して終了してください...")
     try:
-        input()
-    except (EOFError, KeyboardInterrupt):
-        pass
+        if len(sys.argv) < 2:
+            print(
+                "使用方法: python convert2mp4.py <入力ファイル/フォルダ> [入力ファイル/フォルダ...]"
+            )
+            sys.exit(1)
+
+        process_paths(sys.argv[1:])
+
+        print("\n処理が完了しました。任意のキーを押して終了してください...")
+        try:
+            input()
+        except (EOFError, KeyboardInterrupt):
+            pass
+
+    except Exception as e:
+        logger.error(f"予期せぬエラーが発生しました: {str(e)}")
+        print("\nエラーが発生しました。任意のキーを押して終了してください...")
+        try:
+            input()
+        except (EOFError, KeyboardInterrupt):
+            pass
 
 
 if __name__ == "__main__":
