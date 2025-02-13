@@ -91,38 +91,43 @@ def get_video_info(path: Path) -> Optional[Tuple[Path, str, str]]:
     return path, vcodec, get_codec_info(path, "a:0")
 
 
-def get_ffmpeg_command(path: Path, video_codec: str, audio_codec: str) -> Sequence[str]:
-    """FFmpegコマンドを生成"""
+def get_handbrake_command(
+    path: Path, video_codec: str, audio_codec: str
+) -> Sequence[str]:
+    """HandBrakeコマンドを生成"""
     output_path = get_output_path(path)
     common_args = [
-        "ffmpeg",
-        "-hide_banner",
-        "-v",
-        "error",
-        # "-stats",
-        "-i",
+        "HandBrakeCLI",
+        "--input",
         str(path),
-        "-map_metadata",
-        "-1",
-        "-movflags",
-        "+faststart",
+        "--output",
+        str(output_path),
+        "--format",
+        "av_mp4",
+        "--optimize",
+        "--align-av",
+        "--markers",
     ]
 
     if needs_encode(video_codec, audio_codec):
         encode_args = [
-            "-c:v",
-            "av1_nvenc",
-            "-preset",
-            "p7",
-            "-tune",
-            "hq",
-            "-c:a",
+            "--encoder",
+            "nvenc_av1",
+            "--encoder-preset",
+            "slowest",
+            "--quality",
+            "40",
+            "--aencoder",
             "aac",
+            "--ab",
+            "128",
+            "--mixdown",
+            "stereo",
         ]
     else:
-        encode_args = ["-c", "copy"]
+        encode_args = ["--copy-video", "--copy-audio"]
 
-    return [*common_args, *encode_args, str(output_path)]
+    return [*common_args, *encode_args]
 
 
 def convert_video(path: Path, video_codec: str, audio_codec: str) -> bool:
@@ -138,10 +143,16 @@ def convert_video(path: Path, video_codec: str, audio_codec: str) -> bool:
     )
 
     try:
-        cmd = get_ffmpeg_command(path, video_codec, audio_codec)
-        result = subprocess.run(cmd)
+        result = subprocess.run(
+            get_handbrake_command(path, video_codec, audio_codec),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
         if result.returncode != 0:
             logger.error(f"エラー: 変換失敗: {path}")
+            logger.error(f"エラー内容: {result.stderr}")
             return False
 
         logger.info(f"変換成功: {path}")
