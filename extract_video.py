@@ -2,6 +2,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Iterator, List, Optional, Tuple
 
@@ -100,13 +101,40 @@ def format_handbrake_command(cmd: List[str]) -> str:
     return " ".join(formatted_cmd)
 
 
+def get_temp_path(output_path: Path) -> Path:
+    """一時ファイルのパスを生成"""
+    # 一時ファイルの拡張子を元のファイルと同じにする
+    suffix = output_path.suffix
+    # 一時ファイルを作成（ファイル自体は作成されるが内容は空）
+    temp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+    temp_file.close()
+    return Path(temp_file.name)
+
+
+def get_ffmpeg_command(tmp_path: Path, output_path: Path) -> List[str]:
+    """ffmpegコマンドを生成"""
+    return [
+        "ffmpeg",
+        "-hide_banner",
+        "-i",
+        str(tmp_path),
+        "-map_metadata",
+        "-1",
+        "-c",
+        "copy",
+        str(output_path),
+    ]
+
+
 def extract_chapter(
     input_file: Path,
     output_file: Path,
     chapter_number: int,
 ) -> bool:
     """HandBrakeを使用して特定のチャプターを抽出してmp4に変換"""
-    cmd = [
+    temp_output = get_temp_path(output_file)
+
+    handbrake_cmd = [
         "HandBrakeCLI",
         # ソースオプション
         "--input",
@@ -117,7 +145,7 @@ def extract_chapter(
         "0:0",  # プレビュー画像を生成しない
         # 出力先オプション
         "--output",
-        str(output_file),
+        str(temp_output),
         "--format",  # コンテナフォーマット
         "av_mp4",
         "--no-markers",  # チャプターマーカー無し
@@ -187,16 +215,32 @@ def extract_chapter(
     ]
 
     # PowerShell用コマンドを表示
-    print("\nテスト用コマンド:")
-    print(format_handbrake_command(cmd))
+    print("テスト用コマンド:")
+    print(format_handbrake_command(handbrake_cmd))
     print()
 
-    result = run_command(cmd, "エンコード", input_file)
-    if result is None:
-        if output_file.exists():
-            output_file.unlink()
-        return False
-    return True
+    try:
+        # HandBrakeでエンコード
+        result = run_command(handbrake_cmd, "エンコード", input_file)
+        if result is None:
+            if temp_output.exists():
+                temp_output.unlink()
+            return False
+
+        # ffmpegでメタデータ除去
+        ffmpeg_cmd = get_ffmpeg_command(temp_output, output_file)
+        result = run_command(ffmpeg_cmd, "メタデータ除去", temp_output)
+        if result is None:
+            if output_file.exists():
+                output_file.unlink()
+            return False
+
+        return True
+    finally:
+        try:
+            temp_output.unlink()
+        except FileNotFoundError:
+            pass  # ファイルが既に削除されている場合は無視
 
 
 def find_mkv_files(path: Path) -> Iterator[Path]:
@@ -242,7 +286,7 @@ def main() -> None:
         input("Enterキーで終了")
         return
 
-    required_commands = ["HandBrakeCLI", "mkvextract"]
+    required_commands = ["HandBrakeCLI", "mkvextract", "ffmpeg"]
     if not check_dependencies(required_commands):
         input("Enterキーで終了")
         return
