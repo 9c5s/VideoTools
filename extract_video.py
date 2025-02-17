@@ -134,66 +134,44 @@ def extract_chapter(
     """HandBrakeを使用して特定のチャプターを抽出してmp4に変換"""
     temp_output = get_temp_path(output_file)
 
+    # fmt: off
     handbrake_cmd = [
         "HandBrakeCLI",
         # ソースオプション
-        "--input",
-        str(input_file),
-        "--chapters",
-        f"{chapter_number}",
-        "--previews",
-        "0:0",  # プレビュー画像を生成しない
+        "--input", str(input_file),
+        "--chapters", f"{chapter_number}",
+        "--previews", "0:0",  # プレビュー画像を生成しない
         # 出力先オプション
-        "--output",
-        str(temp_output),
-        "--format",  # コンテナフォーマット
-        "av_mp4",
+        "--output", str(temp_output),
+        "--format", "av_mp4",  # コンテナフォーマット
         "--no-markers",  # チャプターマーカー無し
         "--optimize",  # MOOVアトムを先頭に配置
         "--no-ipod-atom",  # iPod 5Gアトムを無効化
         "--align-av",  # AV同期
         # ビデオオプション
-        "--encoder",
-        "nvenc_h264",
-        "--encoder-preset",
-        "fastest",
-        # "--encoder-tune",  # x264用
-        # "film",  # x264用
-        "--encoder-profile",
-        "high",
-        "--encoder-level",
-        "auto",
-        "--vb",
-        "6000",
-        # "--multi-pass",  # x264用
-        # "--turbo",  # x264用
+        "--encoder", "nvenc_h264",
+        "--encoder-preset", "fastest",
+        # "--encoder-tune", "film",  # x264用
+        "--encoder-profile", "high",
+        "--encoder-level", "auto",
+        "--vb", "6000",
+        # "--multi-pass", "--turbo",  # x264用
         "--cfr",  # ソースの平均フレームレートで固定
-        "--enable-hw-decoding",
-        "nvdec",
+        "--enable-hw-decoding", "nvdec",
         # オーディオオプション
-        "--first-audio",
-        "--aencoder",
-        "av_aac",
-        "--ab",
-        "128",
-        "--mixdown",
-        "stereo",
-        "--normalize-mix",
-        "1",  # 正規化有効
-        "--arate",
-        "48",
-        "--drc",  # ダイナミックレンジ圧縮を適用
-        "2.5",
+        "--first-audio",  # 最初のトラックのみ選択
+        "--aencoder", "av_aac",
+        "--ab", "128",
+        "--mixdown", "stereo",
+        "--normalize-mix", "1",  # 音量正規化有効
+        "--arate", "48",
+        "--drc", "2.5",  # ダイナミックレンジ圧縮を適用
         # 画像オプション
-        "--width",
-        "1920",
-        "--height",
-        "1080",
-        "--crop-mode",
-        "none",
+        "--width", "1920",
+        "--height", "1080",
+        "--crop-mode", "none",
         "--non-anamorphic",
-        # "--color-matrix",  # 要不要調査
-        # "709",
+        # "--color-matrix", "709",  # 要不要調査
         # フィルターオプション
         "--no-comb-detect",
         "--no-deinterlace",
@@ -206,13 +184,12 @@ def extract_chapter(
         "--no-unsharp",
         "--no-lapsharp",
         "--no-deblock",
-        "--colorspace",
-        "bt709",
+        "--colorspace", "bt709",
         "--no-grayscale",
         # 字幕オプション
-        "--subtitle",
-        "none",
+        "--subtitle", "none",
     ]
+    # fmt: on
 
     # PowerShell用コマンドを表示
     print("テスト用コマンド:")
