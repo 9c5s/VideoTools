@@ -126,16 +126,12 @@ def get_ffmpeg_command(tmp_path: Path, output_path: Path) -> List[str]:
     ]
 
 
-def extract_chapter(
-    input_file: Path,
-    output_file: Path,
-    chapter_number: int,
-) -> bool:
-    """HandBrakeを使用して特定のチャプターを抽出してmp4に変換"""
-    temp_output = get_temp_path(output_file)
-
+def get_handbrake_command(
+    input_file: Path, temp_output: Path, chapter_number: int
+) -> List[str]:
+    """HandBrakeコマンドを生成"""
     # fmt: off
-    handbrake_cmd = [
+    return [
         "HandBrakeCLI",
         # ソースオプション
         "--input", str(input_file),
@@ -190,6 +186,18 @@ def extract_chapter(
         "--subtitle", "none",
     ]
     # fmt: on
+
+
+def extract_chapter(
+    input_file: Path,
+    output_file: Path,
+    chapter_number: int,
+) -> bool:
+    """HandBrakeを使用して特定のチャプターを抽出してmp4に変換"""
+    temp_output = get_temp_path(output_file)
+
+    # HandBrakeコマンドを生成
+    handbrake_cmd = get_handbrake_command(input_file, temp_output, chapter_number)
 
     # PowerShell用コマンドを表示
     print("テスト用コマンド:")
