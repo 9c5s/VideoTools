@@ -8,6 +8,8 @@ from typing import Iterator, List, Optional, Tuple
 
 from pathvalidate import sanitize_filename
 
+from funcs import normalize_audio
+
 
 def check_dependencies(commands: List[str]) -> bool:
     """必要な外部コマンドが利用可能か確認"""
@@ -101,29 +103,12 @@ def format_handbrake_command(cmd: List[str]) -> str:
     return " ".join(formatted_cmd)
 
 
-def get_temp_path(output_path: Path) -> Path:
+def get_temp_path(suffix: str) -> Path:
     """一時ファイルのパスを生成"""
-    # 一時ファイルの拡張子を元のファイルと同じにする
-    suffix = output_path.suffix
     # 一時ファイルを作成（ファイル自体は作成されるが内容は空）
     temp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
     temp_file.close()
     return Path(temp_file.name)
-
-
-def get_ffmpeg_command(tmp_path: Path, output_path: Path) -> List[str]:
-    """ffmpegコマンドを生成"""
-    return [
-        "ffmpeg",
-        "-hide_banner",
-        "-i",
-        str(tmp_path),
-        "-map_metadata",
-        "-1",
-        "-c",
-        "copy",
-        str(output_path),
-    ]
 
 
 def get_handbrake_command(
@@ -156,12 +141,7 @@ def get_handbrake_command(
         "--enable-hw-decoding", "nvdec",
         # オーディオオプション
         "--first-audio",  # 最初のトラックのみ選択
-        "--aencoder", "av_aac",
-        "--ab", "128",
-        "--mixdown", "stereo",
-        "--normalize-mix", "1",  # 音量正規化有効
-        "--arate", "48",
-        "--drc", "2.5",  # ダイナミックレンジ圧縮を適用
+        "--aencoder", "flac24",
         # 画像オプション
         "--width", "1920",
         "--height", "1080",
@@ -193,8 +173,9 @@ def extract_chapter(
     output_file: Path,
     chapter_number: int,
 ) -> bool:
-    """HandBrakeを使用して特定のチャプターを抽出してmp4に変換"""
-    temp_output = get_temp_path(output_file)
+    """HandBrakeを使用して特定のチャプターを抽出してmp4に変換し、音量を正規化"""
+    # 一時ファイルのパスを生成
+    temp_output = get_temp_path(output_file.suffix)
 
     # HandBrakeコマンドを生成
     handbrake_cmd = get_handbrake_command(input_file, temp_output, chapter_number)
@@ -212,10 +193,12 @@ def extract_chapter(
                 temp_output.unlink()
             return False
 
-        # ffmpegでメタデータ除去
-        ffmpeg_cmd = get_ffmpeg_command(temp_output, output_file)
-        result = run_command(ffmpeg_cmd, "メタデータ除去", temp_output)
-        if result is None:
+        # 音量を正規化
+        try:
+            normalize_audio(temp_output, output_file)
+        except Exception as e:
+            print(f"エラー: 音量正規化に失敗: {output_file}")
+            print(f"エラー内容: {str(e)}")
             if output_file.exists():
                 output_file.unlink()
             return False
