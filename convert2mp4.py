@@ -93,9 +93,10 @@ def get_video_info(path: Path) -> Optional[Tuple[Path, str, str]]:
 
 
 def get_handbrake_command(path: Path, tmp_path: Path) -> Sequence[str]:
-    """HandBrakeコマンドを生成"""
-    common_args = [
+    """HandBrakeコマンドを生成（エンコード用）"""
+    return [
         "HandBrakeCLI",
+        "--force",
         "--input",
         str(path),
         "--output",
@@ -105,11 +106,8 @@ def get_handbrake_command(path: Path, tmp_path: Path) -> Sequence[str]:
         "--optimize",
         "--align-av",
         "--markers",
-    ]
-
-    encode_args = [
         "--encoder",
-        "nvenc_av1",
+        "nvenc_av1_10bit",
         "--encoder-preset",
         "slowest",
         "--quality",
@@ -122,13 +120,26 @@ def get_handbrake_command(path: Path, tmp_path: Path) -> Sequence[str]:
         "stereo",
     ]
 
-    return [*common_args, *encode_args]
+
+def get_ffmpeg_copy_command(path: Path, tmp_path: Path) -> Sequence[str]:
+    """FFmpegコマンドを生成（コピー用）"""
+    return [
+        "ffmpeg",
+        "-hide_banner",
+        "-y",
+        "-i",
+        str(path),
+        "-c",
+        "copy",
+        str(tmp_path),
+    ]
 
 
 def get_ffmpeg_command(tmp_path: Path, output_path: Path) -> Sequence[str]:
     """FFmpegコマンドを生成（メタデータ除去用）"""
     return [
         "ffmpeg",
+        "-hide_banner",
         "-i",
         str(tmp_path),
         "-map_metadata",
@@ -141,6 +152,27 @@ def get_ffmpeg_command(tmp_path: Path, output_path: Path) -> Sequence[str]:
     ]
 
 
+def run_command(cmd: Sequence[str], description: str, path: Path) -> bool:
+    """コマンドを実行"""
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if result.returncode != 0:
+            logger.error(f"エラー: {description}失敗: {path}")
+            logger.error(f"エラー内容:\n{result.stderr}")
+            return False
+        return True
+    except subprocess.SubprocessError as e:
+        logger.error(f"エラー: {description}失敗: {path}")
+        logger.error(f"エラー内容: {str(e)}")
+        return False
+
+
 def convert_video(path: Path, video_codec: str, audio_codec: str) -> bool:
     """ビデオを変換"""
     output_path = get_output_path(path)
@@ -149,52 +181,50 @@ def convert_video(path: Path, video_codec: str, audio_codec: str) -> bool:
         return True
 
     logger.info(f"コーデック - ビデオ: {video_codec}, オーディオ: {audio_codec}")
-    logger.info(f"エンコード中: {path}")
+    logger.info(
+        f"{'エンコード' if needs_encode(video_codec, audio_codec) else 'コンテナ変換'}中: {path}"
+    )
 
     # 一時ファイルを作成
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_file:
         tmp_path = Path(tmp_file.name)
 
     try:
-        # HandBrakeでエンコード
-        result = subprocess.run(
-            get_handbrake_command(path, tmp_path),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
+        # 変換処理
+        cmd = (
+            get_handbrake_command(path, tmp_path)
+            if needs_encode(video_codec, audio_codec)
+            else get_ffmpeg_copy_command(path, tmp_path)
         )
-        if result.returncode != 0:
-            logger.error(f"エラー: エンコード失敗: {path}")
-            logger.error(f"エラー内容: {result.stderr}")
+        description = (
+            "エンコード" if needs_encode(video_codec, audio_codec) else "コピー"
+        )
+
+        if not run_command(cmd, description, path):
             return False
 
-        # FFmpegでメタデータ除去
-        result = subprocess.run(
-            get_ffmpeg_command(tmp_path, output_path),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        if result.returncode != 0:
-            logger.error(f"エラー: メタデータ除去失敗: {path}")
-            logger.error(f"エラー内容: {result.stderr}")
+        # エンコード後のファイルサイズを確認
+        if not tmp_path.exists() or tmp_path.stat().st_size == 0:
+            logger.error(
+                f"エラー: エンコード後のファイルが存在しないか空です: {tmp_path}"
+            )
+            return False
+
+        # メタデータ除去
+        if not run_command(
+            get_ffmpeg_command(tmp_path, output_path), "メタデータ除去", path
+        ):
             return False
 
         logger.info(f"変換成功: {path}")
         return True
 
-    except subprocess.SubprocessError as e:
-        logger.error(f"エラー: 変換失敗: {path}")
-        logger.error(f"エラー内容: {str(e)}")
-        return False
-
     finally:
         try:
-            tmp_path.unlink()
-        except Exception:
-            pass
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except Exception as e:
+            logger.error(f"一時ファイルの削除に失敗: {str(e)}")
 
 
 def process_single_file(args: Tuple[int, Path, int]) -> None:
@@ -235,6 +265,14 @@ def process_paths(paths: Sequence[str]) -> None:
         logger.error(f"エラーが発生しました: {str(e)}")
 
 
+def wait_for_key() -> None:
+    """キー入力を待機"""
+    try:
+        input("\n任意のキーを押して終了してください...")
+    except (EOFError, KeyboardInterrupt):
+        pass
+
+
 def main() -> None:
     """メイン処理"""
     try:
@@ -245,20 +283,11 @@ def main() -> None:
             sys.exit(1)
 
         process_paths(sys.argv[1:])
-
-        print("\n処理が完了しました。任意のキーを押して終了してください...")
-        try:
-            input()
-        except (EOFError, KeyboardInterrupt):
-            pass
+        wait_for_key()
 
     except Exception as e:
         logger.error(f"予期せぬエラーが発生しました: {str(e)}")
-        print("\nエラーが発生しました。任意のキーを押して終了してください...")
-        try:
-            input()
-        except (EOFError, KeyboardInterrupt):
-            pass
+        wait_for_key()
 
 
 if __name__ == "__main__":
