@@ -67,6 +67,17 @@ def find_files(path: Path, suffix: str) -> Iterator[Path]:
         )
 
 
+def find_video_files(path: Path) -> Iterator[Path]:
+    """指定されたパスから動画ファイルを再帰的に検索"""
+
+    if path.is_file() and is_video_file(path):
+        yield path
+    elif path.is_dir():
+        yield from (
+            item for item in path.rglob("*") if item.is_file() and is_video_file(item)
+        )
+
+
 def format_command(cmd: List[str]) -> str:
     """コマンドをPowerShell用に整形"""
 
