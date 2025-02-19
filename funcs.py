@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Iterator
 
 from ffmpeg_normalize import FFmpegNormalize
 
@@ -44,3 +45,16 @@ def normalize_audio(input_file: Path, output_file: Path) -> None:
     normalizer.run_normalization()
 
     print(f"音量正規化が完了: {output_file.name}")
+
+
+def find_files(path: Path, suffix: str) -> Iterator[Path]:
+    """指定されたパスから指定された拡張子のファイルを再帰的に検索"""
+    suffix = suffix.lower()
+    if path.is_file() and path.suffix.lower() == suffix:
+        yield path
+    elif path.is_dir():
+        yield from (
+            item
+            for item in path.rglob("*")
+            if item.is_file() and item.suffix.lower() == suffix
+        )

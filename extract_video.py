@@ -4,11 +4,11 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Iterator, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from pathvalidate import sanitize_filename
 
-from funcs import normalize_audio
+from funcs import find_files, normalize_audio
 
 
 def check_dependencies(commands: List[str]) -> bool:
@@ -211,18 +211,6 @@ def extract_chapter(
             pass  # ファイルが既に削除されている場合は無視
 
 
-def find_mkv_files(path: Path) -> Iterator[Path]:
-    """指定されたパスからMKVファイルを再帰的に検索"""
-    if path.is_file() and path.suffix.lower() == ".mkv":
-        yield path
-    elif path.is_dir():
-        yield from (
-            item
-            for item in path.rglob("*")
-            if item.is_file() and item.suffix.lower() == ".mkv"
-        )
-
-
 def process_mkv_file(mkv_file: Path) -> bool:
     """MKVファイルを処理"""
     print(f"\n処理開始: {mkv_file.name}")
@@ -238,10 +226,10 @@ def process_mkv_file(mkv_file: Path) -> bool:
         output_file = mkv_file.parent / f"{safe_name}.mp4"
 
         if output_file.exists():
-            print(f"スキップ [{i}/{total}]: '{chapter_name}' は既に存在します")
+            print(f"\nスキップ [{i}/{total}]: '{chapter_name}' は既に存在します")
             continue
 
-        print(f"抽出中 [{i}/{total}]: '{chapter_name}'")
+        print(f"\n抽出中 [{i}/{total}]: '{chapter_name}'")
         if not extract_chapter(mkv_file, output_file, chapter_number):
             success = False
 
@@ -261,7 +249,7 @@ def main() -> None:
 
     success = True
     for path_str in sys.argv[1:]:
-        for mkv_file in find_mkv_files(Path(path_str)):
+        for mkv_file in find_files(Path(path_str), ".mkv"):
             try:
                 if not process_mkv_file(mkv_file):
                     success = False
