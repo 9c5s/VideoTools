@@ -1,14 +1,13 @@
 import re
 import shutil
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from pathvalidate import sanitize_filename
 
-from funcs import find_files, format_command, normalize_audio
+from funcs import find_files, format_command, normalize_audio, run_command
 
 
 def check_dependencies(commands: List[str]) -> bool:
@@ -53,35 +52,13 @@ def parse_chapter_file(text: str) -> List[Tuple[int, str]]:
     return chapters
 
 
-def run_command(
-    cmd: List[str], description: str, path: Path
-) -> Optional[subprocess.CompletedProcess]:
-    """コマンドを実行"""
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        if result.returncode != 0:
-            print(f"エラー: {description}失敗: {path}")
-            print(f"エラー内容:\n{result.stderr}")
-            return None
-        return result
-    except subprocess.SubprocessError as e:
-        print(f"エラー: {description}失敗: {path}")
-        print(f"エラー内容: {str(e)}")
-        return None
-
-
 def get_chapters(mkv_file: Path) -> List[Tuple[int, str]]:
     """mkvファイルからチャプター情報を取得"""
     result = run_command(
-        ["mkvextract", str(mkv_file), "chapters", "-s"],
-        "チャプター情報取得",
-        mkv_file,
+        cmd=["mkvextract", str(mkv_file), "chapters", "-s"],
+        description="チャプター情報取得",
+        capture_output=True,
+        path=mkv_file,
     )
     if result is None:
         return []
@@ -172,7 +149,12 @@ def extract_chapter(
 
     try:
         # HandBrakeでエンコード
-        result = run_command(handbrake_cmd, "エンコード", input_file)
+        result = run_command(
+            cmd=handbrake_cmd,
+            description="エンコード",
+            capture_output=True,
+            path=input_file,
+        )
         if result is None:
             if temp_output.exists():
                 temp_output.unlink()

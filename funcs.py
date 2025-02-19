@@ -1,5 +1,6 @@
+import subprocess
 from pathlib import Path
-from typing import Iterator, List
+from typing import Iterator, List, Optional
 
 from ffmpeg_normalize import FFmpegNormalize
 
@@ -7,7 +8,7 @@ from ffmpeg_normalize import FFmpegNormalize
 def normalize_audio(input_file: Path, output_file: Path) -> None:
     """音量を正規化"""
 
-    print(f"音量正規化を開始: {input_file.name}")
+    print(f"音量正規化開始: {input_file.name}")
 
     normalizer = FFmpegNormalize(
         normalization_type="ebu",
@@ -44,11 +45,12 @@ def normalize_audio(input_file: Path, output_file: Path) -> None:
     normalizer.add_media_file(str(input_file), str(output_file))
     normalizer.run_normalization()
 
-    print(f"音量正規化が完了: {output_file.name}")
+    print(f"音量正規化完了: {output_file.name}")
 
 
 def find_files(path: Path, suffix: str) -> Iterator[Path]:
     """指定されたパスから指定された拡張子のファイルを再帰的に検索"""
+
     suffix = suffix.lower()
     if path.is_file() and path.suffix.lower() == suffix:
         yield path
@@ -62,6 +64,7 @@ def find_files(path: Path, suffix: str) -> Iterator[Path]:
 
 def format_command(cmd: List[str]) -> str:
     """コマンドをPowerShell用に整形"""
+
     formatted_cmd = []
     for arg in cmd:
         # パス文字を含む引数はクォートで囲む
@@ -71,3 +74,30 @@ def format_command(cmd: List[str]) -> str:
             formatted_cmd.append(arg)
 
     return " ".join(formatted_cmd) + "\n"
+
+
+def run_command(
+    cmd: List[str],
+    description: str = "",
+    capture_output: bool = False,
+    path: Optional[Path] = None,
+) -> Optional[subprocess.CompletedProcess]:
+    """コマンドを実行"""
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=capture_output,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if result.returncode != 0:
+            print(f"エラー: {description}失敗: {path}")
+            print(f"エラー内容:\n{result.stderr}")
+            return None
+        return result
+    except subprocess.SubprocessError as e:
+        print(f"エラー: {description}失敗: {path}")
+        print(f"エラー内容: {str(e)}")
+        return None
