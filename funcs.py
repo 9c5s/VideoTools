@@ -5,6 +5,9 @@ from ffmpeg_normalize import FFmpegNormalize
 
 def normalize_audio(input_file: Path, output_file: Path) -> None:
     """音量を正規化"""
+
+    print(f"音量正規化を開始: {input_file.name}")
+
     normalizer = FFmpegNormalize(
         normalization_type="ebu",
         target_level=-5,
@@ -39,3 +42,5 @@ def normalize_audio(input_file: Path, output_file: Path) -> None:
     )
     normalizer.add_media_file(str(input_file), str(output_file))
     normalizer.run_normalization()
+
+    print(f"音量正規化が完了: {output_file.name}")
