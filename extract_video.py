@@ -8,7 +8,7 @@ from typing import List, Optional, Tuple
 
 from pathvalidate import sanitize_filename
 
-from funcs import find_files, normalize_audio
+from funcs import find_files, format_command, normalize_audio
 
 
 def check_dependencies(commands: List[str]) -> bool:
@@ -87,20 +87,6 @@ def get_chapters(mkv_file: Path) -> List[Tuple[int, str]]:
         return []
 
     return parse_chapter_file(result.stdout)
-
-
-def format_handbrake_command(cmd: List[str]) -> str:
-    """コマンドをPowerShell用に整形"""
-    # パスを含む引数をダブルクォートで囲む
-    formatted_cmd = []
-    for arg in cmd:
-        # パス文字を含む引数はクォートで囲む
-        if any(c in arg for c in r"\/.:"):
-            formatted_cmd.append(f'"{arg}"')
-        else:
-            formatted_cmd.append(arg)
-
-    return " ".join(formatted_cmd)
 
 
 def get_temp_path(suffix: str) -> Path:
@@ -182,8 +168,7 @@ def extract_chapter(
 
     # PowerShell用コマンドを表示
     print("テスト用コマンド:")
-    print(format_handbrake_command(handbrake_cmd))
-    print()
+    print(format_command(handbrake_cmd))
 
     try:
         # HandBrakeでエンコード

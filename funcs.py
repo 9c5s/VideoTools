@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, List
 
 from ffmpeg_normalize import FFmpegNormalize
 
@@ -58,3 +58,16 @@ def find_files(path: Path, suffix: str) -> Iterator[Path]:
             for item in path.rglob("*")
             if item.is_file() and item.suffix.lower() == suffix
         )
+
+
+def format_command(cmd: List[str]) -> str:
+    """コマンドをPowerShell用に整形"""
+    formatted_cmd = []
+    for arg in cmd:
+        # パス文字を含む引数はクォートで囲む
+        if any(c in arg for c in r"\/.:"):
+            formatted_cmd.append(f'"{arg}"')
+        else:
+            formatted_cmd.append(arg)
+
+    return " ".join(formatted_cmd) + "\n"
