@@ -1,8 +1,13 @@
+import os
 import subprocess
 from pathlib import Path
 from typing import Iterator, List, Optional
 
+from dotenv import load_dotenv
 from ffmpeg_normalize import FFmpegNormalize
+
+load_dotenv()
+TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
 
 
 def normalize_audio(input_file: Path, output_file: Path) -> None:
@@ -83,6 +88,10 @@ def run_command(
     path: Optional[Path] = None,
 ) -> Optional[subprocess.CompletedProcess]:
     """コマンドを実行"""
+
+    if TEST_MODE:
+        print(f"[テストモード] {description}")
+        print(f"実行コマンド:\n{format_command(cmd)}")
 
     try:
         result = subprocess.run(
