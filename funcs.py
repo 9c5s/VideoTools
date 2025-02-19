@@ -86,6 +86,7 @@ def run_command(
     description: str = "",
     capture_output: bool = False,
     path: Optional[Path] = None,
+    silent: bool = False,
 ) -> Optional[subprocess.CompletedProcess]:
     """コマンドを実行"""
 
@@ -102,8 +103,9 @@ def run_command(
             errors="replace",
         )
         if result.returncode != 0:
-            print(f"エラー: {description}失敗: {path}")
-            print(f"エラー内容:\n{result.stderr}")
+            if not silent:
+                print(f"エラー: {description}失敗: {path}")
+                print(f"エラー内容:\n{result.stderr}")
             return None
         return result
     except FileNotFoundError as e:
@@ -111,6 +113,39 @@ def run_command(
         print(f"エラー内容: {str(e)}")
         return None
     except subprocess.SubprocessError as e:
-        print(f"エラー: {description}失敗: {path}")
-        print(f"エラー内容: {str(e)}")
+        if not silent:
+            print(f"エラー: {description}失敗: {path}")
+            print(f"エラー内容: {str(e)}")
         return None
+
+
+def is_video_file(file_path: Path) -> bool:
+    """ファイルが動画かどうかを判断する"""
+    if not file_path.is_file():
+        return False
+
+    cmd = [
+        "ffprobe",
+        "-v",
+        "quiet",
+        "-select_streams",
+        "v:0",  # 最初のビデオストリームを選択
+        "-show_entries",
+        "stream=codec_type",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(file_path),
+    ]
+
+    result = run_command(
+        cmd=cmd,
+        description="動画ファイルの判定",
+        capture_output=True,
+        path=file_path,
+        silent=True,
+    )
+    if result is None:
+        return False
+
+    # 出力が"video"であれば動画ファイル
+    return result.stdout.strip() == "video"
