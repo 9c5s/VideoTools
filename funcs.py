@@ -97,6 +97,10 @@ def run_command(
             print(f"エラー内容:\n{result.stderr}")
             return None
         return result
+    except FileNotFoundError as e:
+        print(f"エラー: コマンドが見つかりません: {cmd[0]}")
+        print(f"エラー内容: {str(e)}")
+        return None
     except subprocess.SubprocessError as e:
         print(f"エラー: {description}失敗: {path}")
         print(f"エラー内容: {str(e)}")
