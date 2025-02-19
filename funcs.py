@@ -1,8 +1,13 @@
+import os
 import subprocess
 from pathlib import Path
 from typing import Iterator, List, Optional
 
+from dotenv import load_dotenv
 from ffmpeg_normalize import FFmpegNormalize
+
+load_dotenv()
+TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
 
 
 def normalize_audio(input_file: Path, output_file: Path) -> None:
@@ -62,6 +67,17 @@ def find_files(path: Path, suffix: str) -> Iterator[Path]:
         )
 
 
+def find_video_files(path: Path) -> Iterator[Path]:
+    """指定されたパスから動画ファイルを再帰的に検索"""
+
+    if path.is_file() and is_video_file(path):
+        yield path
+    elif path.is_dir():
+        yield from (
+            item for item in path.rglob("*") if item.is_file() and is_video_file(item)
+        )
+
+
 def format_command(cmd: List[str]) -> str:
     """コマンドをPowerShell用に整形"""
 
@@ -81,8 +97,13 @@ def run_command(
     description: str = "",
     capture_output: bool = False,
     path: Optional[Path] = None,
+    silent: bool = False,
 ) -> Optional[subprocess.CompletedProcess]:
     """コマンドを実行"""
+
+    if TEST_MODE:
+        print(f"[テストモード] {description}")
+        print(f"実行コマンド:\n{format_command(cmd)}")
 
     try:
         result = subprocess.run(
@@ -93,8 +114,9 @@ def run_command(
             errors="replace",
         )
         if result.returncode != 0:
-            print(f"エラー: {description}失敗: {path}")
-            print(f"エラー内容:\n{result.stderr}")
+            if not silent:
+                print(f"エラー: {description}失敗: {path}")
+                print(f"エラー内容:\n{result.stderr}")
             return None
         return result
     except FileNotFoundError as e:
@@ -102,6 +124,39 @@ def run_command(
         print(f"エラー内容: {str(e)}")
         return None
     except subprocess.SubprocessError as e:
-        print(f"エラー: {description}失敗: {path}")
-        print(f"エラー内容: {str(e)}")
+        if not silent:
+            print(f"エラー: {description}失敗: {path}")
+            print(f"エラー内容: {str(e)}")
         return None
+
+
+def is_video_file(file_path: Path) -> bool:
+    """ファイルが動画かどうかを判断する"""
+    if not file_path.is_file():
+        return False
+
+    cmd = [
+        "ffprobe",
+        "-v",
+        "quiet",
+        "-select_streams",
+        "v:0",  # 最初のビデオストリームを選択
+        "-show_entries",
+        "stream=codec_type",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(file_path),
+    ]
+
+    result = run_command(
+        cmd=cmd,
+        description="動画ファイルの判定",
+        capture_output=True,
+        path=file_path,
+        silent=True,
+    )
+    if result is None:
+        return False
+
+    # 出力が"video"であれば動画ファイル
+    return result.stdout.strip() == "video"
