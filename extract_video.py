@@ -8,7 +8,7 @@ from typing import List, Tuple
 
 from pathvalidate import sanitize_filename
 
-from funcs import (
+from utils import (
     TEST_MODE,
     find_files,
     format_time,

@@ -7,7 +7,7 @@ from typing import Any, Dict
 from dotenv import load_dotenv
 from yt_dlp import YoutubeDL
 
-from funcs import normalize_audio
+from utils import normalize_audio
 
 # .envファイルから環境変数を読み込む
 load_dotenv()
