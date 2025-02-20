@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from typing import List
 
-from funcs import find_video_files, normalize_audio
+from utils import find_video_files, normalize_audio
 
 
 def wait_for_exit():
