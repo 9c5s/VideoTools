@@ -18,7 +18,7 @@ def normalize_audio(input_file: Path, output_file: Path) -> None:
     normalizer = FFmpegNormalize(
         normalization_type="ebu",
         target_level=-5,
-        print_stats=False,
+        print_stats=TEST_MODE,
         loudness_range_target=7,
         keep_loudness_range_target=True,
         keep_lra_above_loudness_range_target=False,
@@ -45,7 +45,7 @@ def normalize_audio(input_file: Path, output_file: Path) -> None:
         output_format=None,
         dry_run=False,
         debug=False,
-        progress=False,
+        progress=TEST_MODE,
     )
     normalizer.add_media_file(str(input_file), str(output_file))
     normalizer.run_normalization()
