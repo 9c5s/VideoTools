@@ -160,3 +160,20 @@ def is_video_file(file_path: Path) -> bool:
 
     # 出力が"video"であれば動画ファイル
     return result.stdout.strip() == "video"
+
+
+def format_time(seconds: float) -> str:
+    """秒数を時間形式にフォーマット"""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+
+    # 時間部分を構築
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours}時間")
+    if minutes > 0 or hours > 0:  # 時間がある場合は0分も表示
+        parts.append(f"{minutes:02d}分" if hours > 0 else f"{minutes}分")
+    parts.append(f"{secs:02d}秒" if (hours > 0 or minutes > 0) else f"{secs}秒")
+
+    return " ".join(parts)

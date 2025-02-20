@@ -2,12 +2,19 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import List, Tuple
 
 from pathvalidate import sanitize_filename
 
-from funcs import TEST_MODE, find_files, normalize_audio, run_command
+from funcs import (
+    TEST_MODE,
+    find_files,
+    format_time,
+    normalize_audio,
+    run_command,
+)
 
 
 def check_dependencies(commands: List[str]) -> bool:
@@ -184,6 +191,8 @@ def extract_chapter(
 def process_mkv_file(mkv_file: Path) -> bool:
     """MKVファイルを処理"""
     print(f"\n処理開始: {mkv_file.name}")
+    start_time = time.time()
+
     chapters = get_chapters(mkv_file)
     if not chapters:
         print("チャプター情報が見つかりませんでした")
@@ -192,6 +201,8 @@ def process_mkv_file(mkv_file: Path) -> bool:
     success = True
     total = len(chapters)
     for i, (chapter_number, chapter_name) in enumerate(chapters, 1):
+        chapter_start_time = time.time()
+
         safe_name = sanitize_filename(chapter_name)
         output_file = mkv_file.parent / f"{safe_name}.mp4"
 
@@ -199,9 +210,17 @@ def process_mkv_file(mkv_file: Path) -> bool:
             print(f"\nスキップ [{i}/{total}]: '{chapter_name}' は既に存在します")
             continue
 
-        print(f"\n抽出中 [{i}/{total}]: '{chapter_name}'")
+        print(f"\nエンコード中 [{i}/{total}]: '{chapter_name}'")
         if not extract_chapter(mkv_file, output_file, chapter_number):
             success = False
+
+        # チャプターの処理時間を表示
+        chapter_elapsed_time = time.time() - chapter_start_time
+        print(f"チャプター処理時間: {format_time(chapter_elapsed_time)}")
+
+    # 全体の処理時間を表示
+    total_elapsed_time = time.time() - start_time
+    print(f"\n全体処理時間: {format_time(total_elapsed_time)}")
 
     return success
 
