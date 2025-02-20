@@ -177,3 +177,33 @@ def format_time(seconds: float) -> str:
     parts.append(f"{secs:02d}秒" if (hours > 0 or minutes > 0) else f"{secs}秒")
 
     return " ".join(parts)
+
+
+def get_video_duration(file_path: Path) -> Optional[float]:
+    """動画ファイルの再生時間を秒数で取得する"""
+    cmd = [
+        "ffprobe",
+        "-v",
+        "quiet",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(file_path),
+    ]
+
+    result = run_command(
+        cmd=cmd,
+        description="動画の再生時間取得",
+        capture_output=True,
+        path=file_path,
+        silent=True,
+    )
+
+    if result is None or not result.stdout.strip():
+        return None
+
+    try:
+        return float(result.stdout.strip())
+    except ValueError:
+        return None
