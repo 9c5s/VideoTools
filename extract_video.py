@@ -2,12 +2,19 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import List, Tuple
 
 from pathvalidate import sanitize_filename
 
-from funcs import find_files, normalize_audio, run_command
+from funcs import (
+    TEST_MODE,
+    find_files,
+    format_time,
+    normalize_audio,
+    run_command,
+)
 
 
 def check_dependencies(commands: List[str]) -> bool:
@@ -78,57 +85,64 @@ def get_handbrake_command(
     input_file: Path, temp_output: Path, chapter_number: int
 ) -> List[str]:
     """HandBrakeコマンドを生成"""
-    # fmt: off
-    return [
-        "HandBrakeCLI",
-        # ソースオプション
-        "--input", str(input_file),
-        "--chapters", f"{chapter_number}",
-        "--previews", "0:0",  # プレビュー画像を生成しない
-        # 出力先オプション
-        "--output", str(temp_output),
-        "--format", "av_mp4",  # コンテナフォーマット
-        "--no-markers",  # チャプターマーカー無し
-        "--optimize",  # MOOVアトムを先頭に配置
-        "--no-ipod-atom",  # iPod 5Gアトムを無効化
-        "--align-av",  # AV同期
-        # ビデオオプション
-        "--encoder", "nvenc_h264",
-        "--encoder-preset", "fastest",
-        # "--encoder-tune", "film",  # x264用
-        "--encoder-profile", "high",
-        "--encoder-level", "auto",
-        "--vb", "6000",
-        # "--multi-pass", "--turbo",  # x264用
-        "--cfr",  # ソースの平均フレームレートで固定
-        "--enable-hw-decoding", "nvdec",
-        # オーディオオプション
-        "--first-audio",  # 最初のトラックのみ選択
-        "--aencoder", "flac24",
-        # 画像オプション
-        "--width", "1920",
-        "--height", "1080",
-        "--crop-mode", "none",
-        "--non-anamorphic",
-        # "--color-matrix", "709",  # 要不要調査
-        # フィルターオプション
-        "--no-comb-detect",
-        "--no-deinterlace",
-        "--no-bwdif",
-        "--no-decomb",
-        "--no-detelecine",
-        "--no-hqdn3d",
-        "--no-nlmeans",
-        "--no-chroma-smooth",
-        "--no-unsharp",
-        "--no-lapsharp",
-        "--no-deblock",
-        "--colorspace", "bt709",
-        "--no-grayscale",
-        # 字幕オプション
-        "--subtitle", "none",
-    ]
-    # fmt: on
+    cmd = ["HandBrakeCLI"]
+
+    # ソースオプション
+    cmd.extend(["--input", str(input_file)])
+    cmd.extend(["--chapters", f"{chapter_number}"])
+    cmd.extend(["--previews", "0:0"])  # プレビュー画像を生成しない
+
+    # 出力先オプション
+    cmd.extend(["--output", str(temp_output)])
+    cmd.extend(["--format", "av_mp4"])  # コンテナフォーマット
+    cmd.extend(["--no-markers"])  # チャプターマーカー無し
+    cmd.extend(["--optimize"])  # MOOVアトムを先頭に配置
+    cmd.extend(["--no-ipod-atom"])  # iPod 5Gアトムを無効化
+    cmd.extend(["--align-av"])  # AV同期
+
+    # ビデオオプション
+    cmd.extend(["--encoder", "nvenc_h264" if TEST_MODE else "x264"])
+    cmd.extend(["--encoder-preset", "fastest" if TEST_MODE else "veryslow"])
+    if not TEST_MODE:
+        cmd.extend(["--encoder-tune", "film"])  # x264用
+    cmd.extend(["--encoder-profile", "high"])
+    cmd.extend(["--encoder-level", "auto"])
+    cmd.extend(["--vb", "6000"])
+    if not TEST_MODE:
+        cmd.extend(["--multi-pass", "--turbo"])  # x264用
+    cmd.extend(["--cfr"])  # ソースの平均フレームレートで固定
+    cmd.extend(["--enable-hw-decoding", "nvdec"])
+
+    # オーディオオプション
+    cmd.extend(["--first-audio"])  # 最初のトラックのみ選択
+    cmd.extend(["--aencoder", "flac24"])
+
+    # 画像オプション
+    cmd.extend(["--width", "1920"])
+    cmd.extend(["--height", "1080"])
+    cmd.extend(["--crop-mode", "none"])
+    cmd.extend(["--non-anamorphic"])
+    # cmd.extend(["--color-matrix", "709"])  # 要調査
+
+    # フィルターオプション
+    cmd.extend(["--no-comb-detect"])
+    cmd.extend(["--no-deinterlace"])
+    cmd.extend(["--no-bwdif"])
+    cmd.extend(["--no-decomb"])
+    cmd.extend(["--no-detelecine"])
+    cmd.extend(["--no-hqdn3d"])
+    cmd.extend(["--no-nlmeans"])
+    cmd.extend(["--no-chroma-smooth"])
+    cmd.extend(["--no-unsharp"])
+    cmd.extend(["--no-lapsharp"])
+    cmd.extend(["--no-deblock"])
+    cmd.extend(["--colorspace", "bt709"])
+    cmd.extend(["--no-grayscale"])
+
+    # 字幕オプション
+    cmd.extend(["--subtitle", "none"])
+
+    return cmd
 
 
 def extract_chapter(
@@ -177,6 +191,8 @@ def extract_chapter(
 def process_mkv_file(mkv_file: Path) -> bool:
     """MKVファイルを処理"""
     print(f"\n処理開始: {mkv_file.name}")
+    start_time = time.time()
+
     chapters = get_chapters(mkv_file)
     if not chapters:
         print("チャプター情報が見つかりませんでした")
@@ -185,6 +201,8 @@ def process_mkv_file(mkv_file: Path) -> bool:
     success = True
     total = len(chapters)
     for i, (chapter_number, chapter_name) in enumerate(chapters, 1):
+        chapter_start_time = time.time()
+
         safe_name = sanitize_filename(chapter_name)
         output_file = mkv_file.parent / f"{safe_name}.mp4"
 
@@ -192,9 +210,17 @@ def process_mkv_file(mkv_file: Path) -> bool:
             print(f"\nスキップ [{i}/{total}]: '{chapter_name}' は既に存在します")
             continue
 
-        print(f"\n抽出中 [{i}/{total}]: '{chapter_name}'")
+        print(f"\nエンコード中 [{i}/{total}]: '{chapter_name}'")
         if not extract_chapter(mkv_file, output_file, chapter_number):
             success = False
+
+        # チャプターの処理時間を表示
+        chapter_elapsed_time = time.time() - chapter_start_time
+        print(f"チャプター処理時間: {format_time(chapter_elapsed_time)}")
+
+    # 全体の処理時間を表示
+    total_elapsed_time = time.time() - start_time
+    print(f"\n全体処理時間: {format_time(total_elapsed_time)}")
 
     return success
 
