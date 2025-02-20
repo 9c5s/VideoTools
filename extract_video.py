@@ -7,7 +7,7 @@ from typing import List, Tuple
 
 from pathvalidate import sanitize_filename
 
-from funcs import find_files, format_command, normalize_audio, run_command
+from funcs import find_files, normalize_audio, run_command
 
 
 def check_dependencies(commands: List[str]) -> bool:
@@ -142,10 +142,6 @@ def extract_chapter(
 
     # HandBrakeコマンドを生成
     handbrake_cmd = get_handbrake_command(input_file, temp_output, chapter_number)
-
-    # PowerShell用コマンドを表示
-    print("テスト用コマンド:")
-    print(format_command(handbrake_cmd))
 
     try:
         # HandBrakeでエンコード
