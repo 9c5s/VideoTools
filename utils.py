@@ -1,10 +1,10 @@
-import os
 import subprocess
 from pathlib import Path
 from typing import Iterator, List, Optional
 
 from dotenv import load_dotenv
 from ffmpeg_normalize import FFmpegNormalize
+from pymediainfo import MediaInfo
 
 load_dotenv()
 TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
@@ -135,31 +135,17 @@ def is_video_file(file_path: Path) -> bool:
     if not file_path.is_file():
         return False
 
-    cmd = [
-        "ffprobe",
-        "-v",
-        "quiet",
-        "-select_streams",
-        "v:0",  # 最初のビデオストリームを選択
-        "-show_entries",
-        "stream=codec_type",
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
-        str(file_path),
-    ]
+    media_info = MediaInfo.parse(str(file_path))
 
-    result = run_command(
-        cmd=cmd,
-        description="動画ファイルの判定",
-        capture_output=True,
-        path=file_path,
-        silent=True,
-    )
-    if result is None:
-        return False
+    # ビデオトラックを探す
+    for track in media_info.tracks:
+        if track.track_type == "Video":
+            # アルバムアートや埋め込み画像をスキップ
+            if track.codec == "MJPEG" or track.attached_pic == "1":
+                continue
+            return True
 
-    # 出力が"video"であれば動画ファイル
-    return result.stdout.strip() == "video"
+    return False
 
 
 def format_time(seconds: float) -> str:

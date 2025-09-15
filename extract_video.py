@@ -33,8 +33,8 @@ def check_dependencies(commands: List[str]) -> bool:
 
 
 def is_default_chapter_name(name: str) -> bool:
-    """デフォルトのチャプター名（Chapter XX）かどうかを判定"""
-    pattern = r"^Chapter \d{2}$"
+    """デフォルトのチャプター名かどうかを判定"""
+    pattern = r"^(Chapter|ブックマーク) \d+$"
     return bool(re.match(pattern, name))
 
 
@@ -102,7 +102,7 @@ def get_handbrake_command(
 
     # ビデオオプション
     cmd.extend(["--encoder", "nvenc_h264" if TEST_MODE else "x264"])
-    cmd.extend(["--encoder-preset", "fastest" if TEST_MODE else "veryslow"])
+    cmd.extend(["--encoder-preset", "fastest" if TEST_MODE else "medium"])
     if not TEST_MODE:
         cmd.extend(["--encoder-tune", "film"])  # x264用
     cmd.extend(["--encoder-profile", "high"])
@@ -111,7 +111,7 @@ def get_handbrake_command(
     if not TEST_MODE:
         cmd.extend(["--multi-pass", "--turbo"])  # x264用
     cmd.extend(["--cfr"])  # ソースの平均フレームレートで固定
-    cmd.extend(["--enable-hw-decoding", "nvdec"])
+    # cmd.extend(["--enable-hw-decoding", "nvdec"])
 
     # オーディオオプション
     cmd.extend(["--first-audio"])  # 最初のトラックのみ選択
